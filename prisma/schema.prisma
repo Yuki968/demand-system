@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum RequirementType {
+  PRODUCT_PLANNING
+  PRODUCT_ITERATION
+  CUSTOMER_CUSTOMIZATION
+  DATA_AND_OPERATION
+}
+
+enum RequirementBelong {
+  TWO_POINT_ZERO
+  THREE_POINT_ZERO
+  SMALL_POT
+}
+
+enum PriorityLevel {
+  VERY_HIGH
+  HIGH
+  MEDIUM
+}
+
+enum RequirementStatus {
+  DEMAND_CREATED
+  PRODUCT_INTAKE
+  IMPLEMENTATION_DELIVERY
+  CLOSED
+}
+
+enum StageName {
+  DEMAND_CREATED
+  PRODUCT_INTAKE
+  IMPLEMENTATION_DELIVERY
+}
+
+enum YesNoOption {
+  YES
+  NO
+}
+
+enum FeedbackStatus {
+  FEEDBACK_RECEIVED
+  FEEDBACK_PENDING
+}
+
+model Requirement {
+  id                    Int                @id @default(autoincrement())
+  requirementNo         Int                @unique
+  createdAt             DateTime
+  requirementName       String
+  requirementType       RequirementType
+  requirementBelong     RequirementBelong
+  priority              PriorityLevel
+  currentStatus         RequirementStatus
+  currentOwner          String?
+  relatedProject        String?
+  createdBy             String
+  relatedCustomer       String?
+  isFinished            Boolean            @default(false)
+  totalDurationValue    Int?
+  totalDurationIsManual Boolean            @default(false)
+  updatedAt             DateTime           @updatedAt
+
+  stages                RequirementStage[]
+
+  @@map("requirements")
+}
+
+model RequirementStage {
+  id                       Int             @id @default(autoincrement())
+  requirementId            Int
+  stageName                StageName
+  stageOrder               Int
+  stageReached             Boolean         @default(false)
+  ownerName                String?
+  startTime                DateTime?
+  endTime                  DateTime?
+  relatedCustomer          String?
+
+  outputProductRequirement YesNoOption?
+  outputSolution           YesNoOption?
+  planCompleted            YesNoOption?
+  deliveryCompleted        YesNoOption?
+
+  feedbackStatus           FeedbackStatus?
+  feedbackContent          String?
+  includeNextProduct       YesNoOption?
+  targetProduct            String?
+
+  durationValue            Int?
+  durationIsManual         Boolean         @default(false)
+  updatedAt                DateTime        @updatedAt
+
+  requirement              Requirement     @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@unique([requirementId, stageName])
+  @@map("requirement_stages")
+}
+
+model FieldOption {
+  id                 Int       @id @default(autoincrement())
+  fieldName          String
+  optionValue        String
+  optionLabel        String
+  optionGroup        String?
+  optionOrder        Int
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("field_options")
+}
