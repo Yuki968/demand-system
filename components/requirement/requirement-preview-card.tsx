@@ -38,11 +38,11 @@ export function RequirementPreviewCard({
             {displayText(item.requirementName)}
           </h3>
         </div>
-        <PriorityBadge className="shrink-0 whitespace-nowrap" priority={item.priority} />
+        <StatusBadge className="shrink-0 whitespace-nowrap" status={item.currentStatus} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <StatusBadge className="whitespace-nowrap" status={item.currentStatus} />
+        <PriorityBadge className="whitespace-nowrap" priority={item.priority} />
         <RequirementTypeBadge className="whitespace-nowrap" requirementType={item.requirementType} />
         <RequirementBelongBadge className="whitespace-nowrap" requirementBelong={item.requirementBelong} />
       </div>

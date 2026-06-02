@@ -25,11 +25,11 @@ export function RequirementSummaryCard({ item, selected, onClick }: { item: Requ
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Requirement #{item.requirementNo}</p>
           <h3 className="mt-2 truncate text-base font-semibold text-slate-900">{displayText(item.requirementName)}</h3>
         </div>
-        <PriorityBadge className="shrink-0 whitespace-nowrap" priority={item.priority} />
+        <StatusBadge className="shrink-0 whitespace-nowrap" status={item.currentStatus} />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <StatusBadge className="whitespace-nowrap" status={item.currentStatus} />
+        <PriorityBadge className="whitespace-nowrap" priority={item.priority} />
         <RequirementTypeBadge className="whitespace-nowrap" requirementType={item.requirementType} />
         <RequirementBelongBadge className="whitespace-nowrap" requirementBelong={item.requirementBelong} />
       </div>
