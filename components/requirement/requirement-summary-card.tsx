@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import type { RequirementRecord } from "@/types/requirement";
 
 export function RequirementSummaryCard({ item, selected, onClick }: { item: RequirementRecord; selected?: boolean; onClick: (item: RequirementRecord) => void; }) {
+  const demandStage = item.stages.find((stage) => stage.stageName === "DEMAND_CREATED");
+
   return (
     <button
       type="button"
@@ -33,14 +35,14 @@ export function RequirementSummaryCard({ item, selected, onClick }: { item: Requ
       </div>
 
       <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-        <p className="truncate">{decodeUnicodeEscapes("\u63d0\u51fa\u4eba\uff1a")}{displayText(item.createdBy)}</p>
+        <p className="truncate">{decodeUnicodeEscapes("\u63d0\u51fa\u4eba\uff1a")}{displayText(demandStage?.ownerName ?? item.createdBy)}</p>
         <p className="truncate">{decodeUnicodeEscapes("\u5f53\u524d\u8d1f\u8d23\u4eba\uff1a")}{displayText(item.currentOwner, "-")}</p>
         <p className="truncate">{decodeUnicodeEscapes("\u9879\u76ee\uff1a")}{displayText(item.relatedProject, decodeUnicodeEscapes("\u672a\u586b\u5199\u9879\u76ee"))}</p>
         <p className="truncate">{decodeUnicodeEscapes("\u5ba2\u6237\uff1a")}{displayText(item.relatedCustomer, decodeUnicodeEscapes("\u672a\u586b\u5199\u5ba2\u6237"))}</p>
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
-        <span>{decodeUnicodeEscapes("\u63d0\u51fa\u65e5\u671f\uff1a")}{displayText(item.createdAt)}</span>
+        <span>{decodeUnicodeEscapes("\u63d0\u51fa\u65e5\u671f\uff1a")}{displayText(demandStage?.startTime ?? item.createdAt)}</span>
         <span className="font-semibold text-slate-700">{decodeUnicodeEscapes("\u603b\u65f6\u957f\uff1a")}{item.totalDurationValue ? `${item.totalDurationValue} ${decodeUnicodeEscapes("\u5929")}` : "-"}</span>
       </div>
     </button>

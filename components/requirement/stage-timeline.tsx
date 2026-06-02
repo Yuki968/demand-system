@@ -1,4 +1,6 @@
-﻿import {
+﻿"use client";
+
+import {
   FEEDBACK_STATUS_LABELS,
   YES_NO_LABELS,
 } from "@/constants/requirement";
@@ -21,6 +23,7 @@ const TEXT = {
   noStart: "\u5c1a\u672a\u586b\u5199\u5f00\u59cb\u65f6\u95f4",
   startAt: "\u5f00\u59cb\u4e8e ",
   endAt: "\uff0c\u7ed3\u675f\u4e8e ",
+  durationAt: "\uff0c\u672c\u9636\u6bb5\u65f6\u957f ",
 } as const;
 
 type StageVisualState = "completed" | "current" | "pending";
@@ -30,6 +33,22 @@ function displayDecision(value: string | null) {
   if (value in YES_NO_LABELS) return YES_NO_LABELS[value as keyof typeof YES_NO_LABELS];
   if (value in FEEDBACK_STATUS_LABELS) return FEEDBACK_STATUS_LABELS[value as keyof typeof FEEDBACK_STATUS_LABELS];
   return decodeUnicodeEscapes(value);
+}
+
+function displayStageDuration(stage: RequirementStageRecord) {
+  return stage.durationValue == null ? "-" : `${stage.durationValue} ${decodeUnicodeEscapes("\u5929")}`;
+}
+
+function displayStageTimingSummary(stage: RequirementStageRecord, showDuration: boolean) {
+  const timingText = stage.startTime
+    ? `${decodeUnicodeEscapes(TEXT.startAt)}${displayText(stage.startTime)}${stage.endTime ? `${decodeUnicodeEscapes(TEXT.endAt)}${displayText(stage.endTime)}` : ""}`
+    : decodeUnicodeEscapes(TEXT.noStart);
+
+  if (!showDuration) {
+    return timingText;
+  }
+
+  return `${timingText}${decodeUnicodeEscapes(TEXT.durationAt)}${displayStageDuration(stage)}`;
 }
 
 function resolveVisibleStages(item: RequirementRecord) {
@@ -161,11 +180,11 @@ function getDetailMarkerClass(state: StageVisualState) {
 function buildStageHighlights(stage: RequirementStageRecord, item: RequirementRecord) {
   switch (stage.stageName) {
     case "DEMAND_CREATED":
-      return [[decodeUnicodeEscapes("\u63d0\u51fa\u65f6\u95f4"), displayText(item.createdAt)], [decodeUnicodeEscapes("\u63d0\u51fa\u4eba"), displayText(item.createdBy)], [decodeUnicodeEscapes("\u5173\u8054\u5ba2\u6237"), displayText(item.relatedCustomer)], [decodeUnicodeEscapes("\u5173\u8054\u9879\u76ee"), displayText(item.relatedProject)]] as const;
+      return [[decodeUnicodeEscapes("\u63d0\u51fa\u65f6\u95f4"), displayText(stage.startTime)], [decodeUnicodeEscapes("\u63d0\u51fa\u4eba"), displayText(stage.ownerName)], [decodeUnicodeEscapes("\u5173\u8054\u5ba2\u6237"), displayText(item.relatedCustomer)], [decodeUnicodeEscapes("\u5173\u8054\u9879\u76ee"), displayText(item.relatedProject)]] as const;
     case "PRODUCT_INTAKE":
-      return [[decodeUnicodeEscapes("\u8d1f\u8d23\u4eba"), displayText(stage.ownerName, decodeUnicodeEscapes("\u5f85\u8865\u5145"))], [decodeUnicodeEscapes("\u627f\u63a5\u65f6\u95f4"), displayText(stage.startTime)], [decodeUnicodeEscapes("\u662f\u5426\u8f93\u51fa\u4ea7\u54c1\u9700\u6c42"), displayDecision(stage.outputProductRequirement)], [decodeUnicodeEscapes("\u65b9\u6848\u5f62\u6210"), displayDecision(stage.outputSolution)], [decodeUnicodeEscapes("\u672c\u9636\u6bb5\u65f6\u957f"), stage.durationValue ? `${stage.durationValue} ${decodeUnicodeEscapes("\u5929")}` : "-"]] as const;
+      return [[decodeUnicodeEscapes("\u8d1f\u8d23\u4eba"), displayText(stage.ownerName, decodeUnicodeEscapes("\u5f85\u8865\u5145"))], [decodeUnicodeEscapes("\u627f\u63a5\u65f6\u95f4"), displayText(stage.startTime)], [decodeUnicodeEscapes("\u5f53\u524d\u5361\u70b9"), displayText(stage.blockingReason)], [decodeUnicodeEscapes("\u662f\u5426\u8f93\u51fa\u4ea7\u54c1\u9700\u6c42"), displayDecision(stage.outputProductRequirement)], [decodeUnicodeEscapes("\u65b9\u6848\u5f62\u6210"), displayDecision(stage.outputSolution)], [decodeUnicodeEscapes("\u672c\u9636\u6bb5\u65f6\u957f"), displayStageDuration(stage)]] as const;
     case "IMPLEMENTATION_DELIVERY":
-      return [[decodeUnicodeEscapes("\u8d1f\u8d23\u4eba"), displayText(stage.ownerName, decodeUnicodeEscapes("\u5f85\u8865\u5145"))], [decodeUnicodeEscapes("\u4ea4\u4ed8\u542f\u52a8\u65f6\u95f4"), displayText(stage.startTime)], [decodeUnicodeEscapes("\u65b9\u6848\u5b8c\u6210"), displayDecision(stage.planCompleted)], [decodeUnicodeEscapes("\u4ea4\u4ed8\u5b8c\u6210"), displayDecision(stage.deliveryCompleted)], [decodeUnicodeEscapes("\u53cd\u9988\u72b6\u6001"), displayDecision(stage.feedbackStatus)], [decodeUnicodeEscapes("\u53cd\u9988\u5185\u5bb9"), displayText(stage.feedbackContent)], [decodeUnicodeEscapes("\u7eb3\u5165\u4e0b\u4ee3\u4ea7\u54c1"), displayDecision(stage.includeNextProduct)], [decodeUnicodeEscapes("\u76ee\u6807\u4ea7\u54c1"), displayText(stage.targetProduct)], [decodeUnicodeEscapes("\u672c\u9636\u6bb5\u65f6\u957f"), stage.durationValue ? `${stage.durationValue} ${decodeUnicodeEscapes("\u5929")}` : "-"]] as const;
+      return [[decodeUnicodeEscapes("\u8d1f\u8d23\u4eba"), displayText(stage.ownerName, decodeUnicodeEscapes("\u5f85\u8865\u5145"))], [decodeUnicodeEscapes("\u4ea4\u4ed8\u542f\u52a8\u65f6\u95f4"), displayText(stage.startTime)], [decodeUnicodeEscapes("\u5f53\u524d\u5361\u70b9"), displayText(stage.blockingReason)], [decodeUnicodeEscapes("\u65b9\u6848\u5b8c\u6210"), displayDecision(stage.planCompleted)], [decodeUnicodeEscapes("\u4ea4\u4ed8\u5b8c\u6210"), displayDecision(stage.deliveryCompleted)], [decodeUnicodeEscapes("\u53cd\u9988\u72b6\u6001"), displayDecision(stage.feedbackStatus)], [decodeUnicodeEscapes("\u53cd\u9988\u5185\u5bb9"), displayText(stage.feedbackContent)], [decodeUnicodeEscapes("\u7eb3\u5165\u4e0b\u4ee3\u4ea7\u54c1"), displayDecision(stage.includeNextProduct)], [decodeUnicodeEscapes("\u76ee\u6807\u4ea7\u54c1"), displayText(stage.targetProduct)], [decodeUnicodeEscapes("\u672c\u9636\u6bb5\u65f6\u957f"), displayStageDuration(stage)]] as const;
     default:
       return [] as const;
   }
@@ -217,11 +236,11 @@ export function StageTimeline({ item }: { item: RequirementRecord }) {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h5 className="text-base font-semibold text-slate-900">{STAGE_PROGRESS_LABELS[stage.stageName]}</h5>
-                      <p className="mt-1 text-sm text-slate-500">{stage.startTime ? `${decodeUnicodeEscapes(TEXT.startAt)}${displayText(stage.startTime)}` : decodeUnicodeEscapes(TEXT.noStart)}{stage.endTime ? `${decodeUnicodeEscapes(TEXT.endAt)}${displayText(stage.endTime)}` : ""}</p>
+                      <p className="mt-1 text-sm text-slate-500">{displayStageTimingSummary(stage, true)}</p>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {highlights.map(([label, value]) => <div key={label} className={label === decodeUnicodeEscapes("\u53cd\u9988\u5185\u5bb9") ? "sm:col-span-2" : undefined}><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p><p className="mt-1 text-sm leading-6 text-slate-800">{value}</p></div>)}
+                    {highlights.map(([label, value]) => <div key={label} className={label === decodeUnicodeEscapes("\u53cd\u9988\u5185\u5bb9") || label === decodeUnicodeEscapes("\u5f53\u524d\u5361\u70b9") ? "sm:col-span-2" : undefined}><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p><p className="mt-1 text-sm leading-6 text-slate-800">{value}</p></div>)}
                   </div>
                 </section>
               );
@@ -232,4 +251,3 @@ export function StageTimeline({ item }: { item: RequirementRecord }) {
     </div>
   );
 }
-

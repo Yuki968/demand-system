@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { FormSection } from "@/components/admin/form-section";
 import { PriorityBadge, StatusBadge } from "@/components/requirement/badges";
@@ -27,7 +27,7 @@ const TEXT = {
   create: "\u65b0\u589e\u9700\u6c42",
   edit: "\u7f16\u8f91\u9700\u6c42",
   summaryTitle: "\u4e3b\u4fe1\u606f",
-  summaryDesc: "上方字段为人工最终字段；下方当前状态、当前负责人、总时长、是否结束为系统汇总结果，只读展示，不作为人工真值来源。",
+  summaryDesc: "上方维护需求主字段；其中提出日期与需求提出阶段联动，当前负责人按当前阶段自动汇总，只读展示。",
   stageTitle: "\u9636\u6bb5\u7ef4\u62a4\u5de5\u4f5c\u533a",
   stageDesc: "这里维护阶段事实字段，如负责人、开始/结束时间和关键判断项；保存后系统基于这些事实汇总当前状态、当前负责人、是否结束和自动总时长。",
   save: "\u4fdd\u5b58\u4fee\u6539",
@@ -72,6 +72,67 @@ function getAutoDurationText(stage: RequirementStageRecord) {
   return value ? `${value} ${decodeUnicodeEscapes("\u5929")}` : TEXT.noValue;
 }
 
+function hasDraftProductIntakeStarted(stage: RequirementStageRecord | undefined) {
+  if (!stage) {
+    return false;
+  }
+
+  return Boolean(
+      stage.ownerName ||
+      stage.startTime ||
+      stage.endTime ||
+      stage.outputProductRequirement ||
+      stage.outputSolution,
+  );
+}
+
+function hasDraftImplementationStarted(stage: RequirementStageRecord | undefined) {
+  if (!stage) {
+    return false;
+  }
+
+  return Boolean(
+    stage.ownerName ||
+      stage.startTime ||
+      stage.endTime ||
+      stage.planCompleted ||
+      stage.deliveryCompleted ||
+      stage.feedbackStatus ||
+      stage.feedbackContent ||
+      stage.includeNextProduct ||
+      stage.targetProduct,
+  );
+}
+
+function resolveDraftCurrentStatus(stages: RequirementStageRecord[]) {
+  const productStage = stages.find((stage) => stage.stageName === "PRODUCT_INTAKE");
+  const implementationStage = stages.find((stage) => stage.stageName === "IMPLEMENTATION_DELIVERY");
+
+  if (implementationStage?.deliveryCompleted === "YES") {
+    return "CLOSED" as const;
+  }
+
+  if (hasDraftImplementationStarted(implementationStage)) {
+    return "IMPLEMENTATION_DELIVERY" as const;
+  }
+
+  if (hasDraftProductIntakeStarted(productStage)) {
+    return "PRODUCT_INTAKE" as const;
+  }
+
+  return "DEMAND_CREATED" as const;
+}
+
+function resolveDraftCurrentOwner(stages: RequirementStageRecord[]) {
+  const currentStatus = resolveDraftCurrentStatus(stages);
+
+  if (currentStatus === "CLOSED") {
+    return null;
+  }
+
+  return stages.find((stage) => stage.stageName === currentStatus)?.ownerName ?? null;
+}
+
 function validateStageDates(stages: RequirementStageRecord[]) {
   const errors: string[] = [];
 
@@ -104,25 +165,77 @@ export function buildEmptyDraft(): RequirementDraft {
     relatedProject: "",
     totalDurationIsManual: false,
     totalDurationValue: null,
-    stages: STAGE_SEQUENCE.map((stageName, index) => ({ id: -(index + 1), requirementId: 0, stageName, stageOrder: index + 1, stageReached: stageName === "DEMAND_CREATED", ownerName: stageName === "DEMAND_CREATED" ? "" : null, startTime: stageName === "DEMAND_CREATED" ? new Date().toISOString().slice(0, 10) : null, endTime: null, relatedCustomer: null, outputProductRequirement: null, outputSolution: null, planCompleted: null, deliveryCompleted: null, feedbackStatus: null, feedbackContent: null, includeNextProduct: null, targetProduct: null, durationValue: null, durationIsManual: false, updatedAt: new Date().toISOString().slice(0, 10) })),
+    stages: STAGE_SEQUENCE.map((stageName, index) => ({ id: -(index + 1), requirementId: 0, stageName, stageOrder: index + 1, stageReached: stageName === "DEMAND_CREATED", ownerName: stageName === "DEMAND_CREATED" ? "" : null, startTime: stageName === "DEMAND_CREATED" ? new Date().toISOString().slice(0, 10) : null, endTime: null, relatedCustomer: null, blockingReason: null, outputProductRequirement: null, outputSolution: null, planCompleted: null, deliveryCompleted: null, feedbackStatus: null, feedbackContent: null, includeNextProduct: null, targetProduct: null, durationValue: null, durationIsManual: false, updatedAt: new Date().toISOString().slice(0, 10) })),
   };
 }
 
 export function toDraftFromRequirement(item: RequirementRecord): RequirementDraft {
-  return { requirementName: item.requirementName, requirementType: item.requirementType, requirementBelong: item.requirementBelong, priority: item.priority, createdAt: item.createdAt, createdBy: item.createdBy, relatedCustomer: item.relatedCustomer, relatedProject: item.relatedProject, totalDurationIsManual: item.totalDurationIsManual, totalDurationValue: item.totalDurationValue, stages: item.stages };
+  const stageMap = new Map(item.stages.map((stage) => [stage.stageName, stage]));
+  const stages = STAGE_SEQUENCE.map((stageName, index) => {
+    const existingStage = stageMap.get(stageName);
+    if (existingStage) {
+      return { ...existingStage, relatedCustomer: null };
+    }
+
+    return {
+      id: -(index + 1),
+      requirementId: item.id,
+      stageName,
+      stageOrder: index + 1,
+      stageReached: stageName === "DEMAND_CREATED",
+      ownerName: stageName === "DEMAND_CREATED" ? item.createdBy : null,
+      startTime: stageName === "DEMAND_CREATED" ? item.createdAt : null,
+      endTime: null,
+      relatedCustomer: null,
+      blockingReason: null,
+      outputProductRequirement: null,
+      outputSolution: null,
+      planCompleted: null,
+      deliveryCompleted: null,
+      feedbackStatus: null,
+      feedbackContent: null,
+      includeNextProduct: null,
+      targetProduct: null,
+      durationValue: null,
+      durationIsManual: false,
+      updatedAt: item.updatedAt,
+    } satisfies RequirementStageRecord;
+  });
+  const demandStage = stages.find((stage) => stage.stageName === "DEMAND_CREATED");
+
+  return {
+    requirementName: item.requirementName,
+    requirementType: item.requirementType,
+    requirementBelong: item.requirementBelong,
+    priority: item.priority,
+    createdAt: demandStage?.startTime ?? item.createdAt,
+    createdBy: demandStage?.ownerName ?? item.createdBy,
+    relatedCustomer: item.relatedCustomer,
+    relatedProject: item.relatedProject,
+    totalDurationIsManual: item.totalDurationIsManual,
+    totalDurationValue: item.totalDurationValue,
+    stages,
+  };
 }
 
 export function RequirementEditor({ mode, draft, currentRequirement, onChange, onSubmit, onSync, onDelete, saving, deleting }: { mode: "create" | "edit"; draft: RequirementDraft; currentRequirement: RequirementRecord | null; onChange: (draft: RequirementDraft) => void; onSubmit: () => void; onSync: () => void; onDelete?: () => void; saving: boolean; deleting?: boolean; }) {
-  const [activeStageName, setActiveStageName] = useState<StageNameKey>(resolveDefaultActiveStage(mode, currentRequirement));
+  const defaultActiveStageName = resolveDefaultActiveStage(mode, currentRequirement);
+  const stageScopeKey = `${mode}:${currentRequirement?.id ?? "create"}:${currentRequirement?.currentStatus ?? "DEMAND_CREATED"}`;
+  const [activeStageState, setActiveStageState] = useState<{ key: string; stageName: StageNameKey }>({
+    key: stageScopeKey,
+    stageName: defaultActiveStageName,
+  });
   const [formError, setFormError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setActiveStageName(resolveDefaultActiveStage(mode, currentRequirement));
-  }, [mode, currentRequirement?.id, currentRequirement?.currentStatus]);
+  const activeStageName =
+    activeStageState.key === stageScopeKey
+      ? activeStageState.stageName
+      : defaultActiveStageName;
 
   const stageMap = useMemo(() => Object.fromEntries(draft.stages.map((stage) => [stage.stageName, stage])) as Record<StageNameKey, RequirementStageRecord>, [draft.stages]);
   const visibleStageNames = STAGE_PROGRESS_SEQUENCE;
   const activeStage = stageMap[activeStageName] ?? stageMap[visibleStageNames[0]];
+  const draftCurrentOwner = useMemo(() => resolveDraftCurrentOwner(draft.stages), [draft.stages]);
+  const demandStage = stageMap.DEMAND_CREATED;
 
   if (!activeStage) {
     return null;
@@ -136,7 +249,16 @@ export function RequirementEditor({ mode, draft, currentRequirement, onChange, o
 
   function patchStage(stageName: RequirementStageRecord["stageName"], patch: Partial<RequirementStageRecord>) {
     setFormError(null);
-    onChange({ ...draft, stages: draft.stages.map((stage) => (stage.stageName === stageName ? { ...stage, ...patch } : stage)) });
+    const stages = draft.stages.map((stage) => (stage.stageName === stageName ? { ...stage, ...patch } : stage));
+    const nextDraft: RequirementDraft = { ...draft, stages };
+
+    if (stageName === "DEMAND_CREATED") {
+      const nextDemandStage = stages.find((stage) => stage.stageName === "DEMAND_CREATED");
+      nextDraft.createdAt = nextDemandStage?.startTime ?? "";
+      nextDraft.createdBy = nextDemandStage?.ownerName ?? "";
+    }
+
+    onChange(nextDraft);
   }
 
   function handleSubmitClick() {
@@ -182,8 +304,8 @@ export function RequirementEditor({ mode, draft, currentRequirement, onChange, o
       <FormSection title={TEXT.summaryTitle} description={TEXT.summaryDesc}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="\u9700\u6c42\u540d\u79f0"><input value={draft.requirementName} onChange={(event) => patchRequirement("requirementName", event.target.value)} className={fieldClassName} /></Field>
-          <Field label="\u63d0\u51fa\u65e5\u671f"><input type="date" value={draft.createdAt} onChange={(event) => patchRequirement("createdAt", event.target.value)} className={fieldClassName} /></Field>
-          <Field label="\u63d0\u51fa\u4eba"><input value={draft.createdBy} onChange={(event) => patchRequirement("createdBy", event.target.value)} className={fieldClassName} /></Field>
+          <Field label="\u63d0\u51fa\u65e5\u671f"><input type="date" value={demandStage?.startTime ?? draft.createdAt} onChange={(event) => patchStage("DEMAND_CREATED", { startTime: event.target.value || null })} className={fieldClassName} /></Field>
+          <Field label="\u5f53\u524d\u8d1f\u8d23\u4eba"><input value={draftCurrentOwner ?? ""} readOnly className={fieldClassName} /></Field>
           <Field label="\u5173\u8054\u9879\u76ee"><input value={draft.relatedProject ?? ""} onChange={(event) => patchRequirement("relatedProject", event.target.value)} className={fieldClassName} /></Field>
           <Field label="\u9700\u6c42\u7c7b\u578b"><SelectField value={draft.requirementType} options={FORM_OPTIONS.requirementType} onChange={(value) => patchRequirement("requirementType", value as RequirementDraft["requirementType"])} /></Field>
           <Field label="\u9700\u6c42\u5f52\u5c5e"><SelectField value={draft.requirementBelong} options={FORM_OPTIONS.requirementBelong} onChange={(value) => patchRequirement("requirementBelong", value as RequirementDraft["requirementBelong"])} /></Field>
@@ -200,7 +322,7 @@ export function RequirementEditor({ mode, draft, currentRequirement, onChange, o
           <div className="grid gap-3 xl:grid-cols-3">
             {visibleStageNames.map((stageName, index) => {
               const stage = stageMap[stageName];
-              return <button key={stageName} type="button" onClick={() => setActiveStageName(stageName)} className={cn("group relative rounded-2xl border px-4 py-3 text-left transition", activeStageName === stageName ? "border-sky-200 bg-white shadow-sm" : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white")}><div className="flex items-start gap-3"><div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition", activeStageName === stageName ? "border-sky-200 bg-sky-50 text-slate-900" : "border-slate-200 bg-white text-slate-500")}>{index + 1}</div><div className="min-w-0"><p className="text-sm font-semibold text-slate-900">{STAGE_PROGRESS_LABELS[stageName]}</p><p className="mt-1 text-xs text-slate-500">{decodeUnicodeEscapes(stage?.stageReached ? TEXT.started : TEXT.pending)}</p></div></div>{index < visibleStageNames.length - 1 ? <div className="mt-3 h-px w-full bg-slate-200/80" /> : <div className="mt-3 h-px w-full bg-transparent" />}</button>;
+              return <button key={stageName} type="button" onClick={() => setActiveStageState({ key: stageScopeKey, stageName })} className={cn("group relative rounded-2xl border px-4 py-3 text-left transition", activeStageName === stageName ? "border-sky-200 bg-white shadow-sm" : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white")}><div className="flex items-start gap-3"><div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition", activeStageName === stageName ? "border-sky-200 bg-sky-50 text-slate-900" : "border-slate-200 bg-white text-slate-500")}>{index + 1}</div><div className="min-w-0"><p className="text-sm font-semibold text-slate-900">{STAGE_PROGRESS_LABELS[stageName]}</p><p className="mt-1 text-xs text-slate-500">{decodeUnicodeEscapes(stage?.stageReached ? TEXT.started : TEXT.pending)}</p></div></div>{index < visibleStageNames.length - 1 ? <div className="mt-3 h-px w-full bg-slate-200/80" /> : <div className="mt-3 h-px w-full bg-transparent" />}</button>;
             })}
           </div>
         </div>
@@ -242,9 +364,9 @@ function stageDescription(stageName: (typeof STAGE_PROGRESS_SEQUENCE)[number]) {
 function renderStageFields(stageName: StageNameKey, stage: RequirementStageRecord, patchStage: (stageName: RequirementStageRecord["stageName"], patch: Partial<RequirementStageRecord>) => void) {
   const endTimeField = <Field label="\u7ed3\u675f\u65f6\u95f4"><input type="date" value={stage.endTime ?? ""} onChange={(event) => patchStage(stageName, { endTime: event.target.value || null })} className={fieldClassName} /></Field>;
   switch (stageName) {
-    case "DEMAND_CREATED": return <><Field label="\u63d0\u51fa\u4eba / \u9636\u6bb5\u8d1f\u8d23\u4eba"><input value={stage.ownerName ?? ""} onChange={(event) => patchStage(stageName, { ownerName: event.target.value })} className={fieldClassName} /></Field><Field label="\u63d0\u51fa\u65f6\u95f4"><input type="date" value={stage.startTime ?? ""} onChange={(event) => patchStage(stageName, { startTime: event.target.value || null })} className={fieldClassName} /></Field>{endTimeField}<Field label="\u9636\u6bb5\u5ba2\u6237"><input value={stage.relatedCustomer ?? ""} onChange={(event) => patchStage(stageName, { relatedCustomer: event.target.value || null })} className={fieldClassName} /></Field></>;
-    case "PRODUCT_INTAKE": return <><Field label="\u8d1f\u8d23\u4eba"><input value={stage.ownerName ?? ""} onChange={(event) => patchStage(stageName, { ownerName: event.target.value })} className={fieldClassName} /></Field><Field label="\u627f\u63a5\u65f6\u95f4"><input type="date" value={stage.startTime ?? ""} onChange={(event) => patchStage(stageName, { startTime: event.target.value || null })} className={fieldClassName} /></Field>{endTimeField}<Field label="\u9636\u6bb5\u5ba2\u6237"><input value={stage.relatedCustomer ?? ""} onChange={(event) => patchStage(stageName, { relatedCustomer: event.target.value || null })} className={fieldClassName} /></Field><Field label="\u662f\u5426\u8f93\u51fa\u4ea7\u54c1\u9700\u6c42"><SelectField value={stage.outputProductRequirement} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { outputProductRequirement: (value || null) as RequirementStageRecord["outputProductRequirement"] })} /></Field><Field label="\u65b9\u6848\u5f62\u6210"><SelectField value={stage.outputSolution} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { outputSolution: (value || null) as RequirementStageRecord["outputSolution"] })} /></Field></>;
-    case "IMPLEMENTATION_DELIVERY": return <><Field label="\u8d1f\u8d23\u4eba"><input value={stage.ownerName ?? ""} onChange={(event) => patchStage(stageName, { ownerName: event.target.value })} className={fieldClassName} /></Field><Field label="\u4ea4\u4ed8\u542f\u52a8\u65f6\u95f4"><input type="date" value={stage.startTime ?? ""} onChange={(event) => patchStage(stageName, { startTime: event.target.value || null })} className={fieldClassName} /></Field>{endTimeField}<Field label="\u65b9\u6848\u5b8c\u6210"><SelectField value={stage.planCompleted} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { planCompleted: (value || null) as RequirementStageRecord["planCompleted"] })} /></Field><Field label="\u4ea4\u4ed8\u5b8c\u6210"><SelectField value={stage.deliveryCompleted} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { deliveryCompleted: (value || null) as RequirementStageRecord["deliveryCompleted"] })} /></Field><Field label="\u53cd\u9988\u72b6\u6001"><SelectField value={stage.feedbackStatus} options={FORM_OPTIONS.feedbackStatus} onChange={(value) => patchStage(stageName, { feedbackStatus: (value || null) as RequirementStageRecord["feedbackStatus"] })} /></Field><Field label="\u7eb3\u5165\u4e0b\u4ee3\u4ea7\u54c1"><SelectField value={stage.includeNextProduct} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { includeNextProduct: (value || null) as RequirementStageRecord["includeNextProduct"] })} /></Field><Field label="\u76ee\u6807\u4ea7\u54c1"><input value={stage.targetProduct ?? ""} onChange={(event) => patchStage(stageName, { targetProduct: event.target.value || null })} className={fieldClassName} /></Field><Field label="\u53cd\u9988\u5185\u5bb9" className="md:col-span-2"><textarea value={stage.feedbackContent ?? ""} onChange={(event) => patchStage(stageName, { feedbackContent: event.target.value || null })} className={cn(fieldClassName, "min-h-24 resize-y")} /></Field></>;
+    case "DEMAND_CREATED": return <><Field label="\u63d0\u51fa\u4eba / \u9636\u6bb5\u8d1f\u8d23\u4eba"><input value={stage.ownerName ?? ""} onChange={(event) => patchStage(stageName, { ownerName: event.target.value })} className={fieldClassName} /></Field><Field label="\u63d0\u51fa\u65f6\u95f4"><input type="date" value={stage.startTime ?? ""} onChange={(event) => patchStage(stageName, { startTime: event.target.value || null })} className={fieldClassName} /></Field>{endTimeField}</>;
+    case "PRODUCT_INTAKE": return <div className="grid min-w-0 gap-5 md:col-span-2"><div className="grid min-w-0 gap-4 xl:grid-cols-2"><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[4.5rem_minmax(0,10rem)]"><span>{decodeUnicodeEscapes("\u8d1f\u8d23\u4eba")}</span><input value={stage.ownerName ?? ""} onChange={(event) => patchStage(stageName, { ownerName: event.target.value })} className={cn(fieldClassName, "w-full min-w-0")} /></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u627f\u63a5\u65f6\u95f4")}</span><input type="date" value={stage.startTime ?? ""} onChange={(event) => patchStage(stageName, { startTime: event.target.value || null })} className={cn(fieldClassName, "w-full min-w-0")} /></label></div><div className="grid min-w-0 gap-4 xl:grid-cols-2"><div className="grid min-w-0 content-start gap-4"><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[8.5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u662f\u5426\u8f93\u51fa\u4ea7\u54c1\u9700\u6c42")}</span><div className="min-w-0 [&>select]:w-full [&>select]:min-w-0"><SelectField value={stage.outputProductRequirement} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { outputProductRequirement: (value || null) as RequirementStageRecord["outputProductRequirement"] })} /></div></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[8.5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u65b9\u6848\u5f62\u6210")}</span><div className="min-w-0 [&>select]:w-full [&>select]:min-w-0"><SelectField value={stage.outputSolution} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { outputSolution: (value || null) as RequirementStageRecord["outputSolution"] })} /></div></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u7ed3\u675f\u65f6\u95f4")}</span><input type="date" value={stage.endTime ?? ""} onChange={(event) => patchStage(stageName, { endTime: event.target.value || null })} className={cn(fieldClassName, "w-full min-w-0")} /></label></div><label className="grid min-w-0 gap-3 text-sm text-slate-600 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center"><span>{decodeUnicodeEscapes("\u5f53\u524d\u5361\u70b9")}</span><textarea value={stage.blockingReason ?? ""} onChange={(event) => patchStage(stageName, { blockingReason: event.target.value || null })} placeholder={decodeUnicodeEscapes("\u8bf4\u660e\u5f53\u524d\u5361\u5728\u4ea7\u54c1\u627f\u63a5\u9636\u6bb5\u7684\u539f\u56e0\u6216\u5173\u952e\u70b9")} className={cn(fieldClassName, "min-h-36 w-full min-w-0 resize-y")} /></label></div></div>;
+    case "IMPLEMENTATION_DELIVERY": return <div className="grid min-w-0 gap-5 md:col-span-2"><div className="grid min-w-0 gap-4 xl:grid-cols-2"><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[4.5rem_minmax(0,10rem)]"><span>{decodeUnicodeEscapes("\u8d1f\u8d23\u4eba")}</span><input value={stage.ownerName ?? ""} onChange={(event) => patchStage(stageName, { ownerName: event.target.value })} className={cn(fieldClassName, "w-full min-w-0")} /></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[6.5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u4ea4\u4ed8\u542f\u52a8\u65f6\u95f4")}</span><input type="date" value={stage.startTime ?? ""} onChange={(event) => patchStage(stageName, { startTime: event.target.value || null })} className={cn(fieldClassName, "w-full min-w-0")} /></label></div><div className="grid min-w-0 gap-4 xl:grid-cols-2"><div className="grid min-w-0 content-start gap-4"><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u65b9\u6848\u5b8c\u6210")}</span><div className="min-w-0 [&>select]:w-full [&>select]:min-w-0"><SelectField value={stage.planCompleted} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { planCompleted: (value || null) as RequirementStageRecord["planCompleted"] })} /></div></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u7ed3\u675f\u65f6\u95f4")}</span><input type="date" value={stage.endTime ?? ""} onChange={(event) => patchStage(stageName, { endTime: event.target.value || null })} className={cn(fieldClassName, "w-full min-w-0")} /></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[5rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u4ea4\u4ed8\u5b8c\u6210")}</span><div className="min-w-0 [&>select]:w-full [&>select]:min-w-0"><SelectField value={stage.deliveryCompleted} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { deliveryCompleted: (value || null) as RequirementStageRecord["deliveryCompleted"] })} /></div></label></div><label className="grid min-w-0 gap-3 text-sm text-slate-600 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center"><span>{decodeUnicodeEscapes("\u5f53\u524d\u5361\u70b9")}</span><textarea value={stage.blockingReason ?? ""} onChange={(event) => patchStage(stageName, { blockingReason: event.target.value || null })} placeholder={decodeUnicodeEscapes("\u8bf4\u660e\u5f53\u524d\u5361\u5728\u4ea4\u4ed8\u9a8c\u6536\u9636\u6bb5\u7684\u539f\u56e0\u6216\u5173\u952e\u70b9")} className={cn(fieldClassName, "min-h-32 w-full min-w-0 resize-y")} /></label></div><div className="grid min-w-0 gap-4 xl:grid-cols-2"><div className="grid min-w-0 content-start gap-4"><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[7rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u53cd\u9988\u72b6\u6001")}</span><div className="min-w-0 [&>select]:w-full [&>select]:min-w-0"><SelectField value={stage.feedbackStatus} options={FORM_OPTIONS.feedbackStatus} onChange={(value) => patchStage(stageName, { feedbackStatus: (value || null) as RequirementStageRecord["feedbackStatus"] })} /></div></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[7rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u7eb3\u5165\u4e0b\u4ee3\u4ea7\u54c1")}</span><div className="min-w-0 [&>select]:w-full [&>select]:min-w-0"><SelectField value={stage.includeNextProduct} options={FORM_OPTIONS.yesNo} onChange={(value) => patchStage(stageName, { includeNextProduct: (value || null) as RequirementStageRecord["includeNextProduct"] })} /></div></label><label className="grid min-w-0 items-center gap-3 text-sm text-slate-600 sm:grid-cols-[7rem_minmax(0,1fr)]"><span>{decodeUnicodeEscapes("\u76ee\u6807\u4ea7\u54c1")}</span><input value={stage.targetProduct ?? ""} onChange={(event) => patchStage(stageName, { targetProduct: event.target.value || null })} className={cn(fieldClassName, "w-full min-w-0")} /></label></div><label className="grid min-w-0 gap-3 text-sm text-slate-600 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center"><span>{decodeUnicodeEscapes("\u53cd\u9988\u5185\u5bb9")}</span><textarea value={stage.feedbackContent ?? ""} onChange={(event) => patchStage(stageName, { feedbackContent: event.target.value || null })} className={cn(fieldClassName, "min-h-32 w-full min-w-0 resize-y")} /></label></div></div>;
     default: return null;
   }
 }

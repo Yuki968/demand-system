@@ -34,6 +34,7 @@ function serializeStage(stage: RequirementStage): RequirementStageRecord {
     startTime: formatDate(stage.startTime),
     endTime: formatDate(stage.endTime),
     relatedCustomer: stage.relatedCustomer,
+    blockingReason: stage.blockingReason,
     outputProductRequirement: stage.outputProductRequirement,
     outputSolution: stage.outputSolution,
     planCompleted: stage.planCompleted,
@@ -198,6 +199,8 @@ export async function batchUpdateStages(
             stage.endTime === undefined ? undefined : parseDateOnly(stage.endTime),
           relatedCustomer:
             stage.relatedCustomer === undefined ? undefined : stage.relatedCustomer || null,
+          blockingReason:
+            stage.blockingReason === undefined ? undefined : stage.blockingReason || null,
           outputProductRequirement:
             stage.outputProductRequirement === undefined
               ? undefined
@@ -228,7 +231,6 @@ export async function initializeStages(
   requirementId: number,
   createdAt: Date,
   createdBy: string,
-  relatedCustomer: string | null | undefined,
 ) {
   return prisma.requirementStage.createMany({
     data: STAGE_SEQUENCE.map((stageName) => ({
@@ -238,7 +240,8 @@ export async function initializeStages(
       stageReached: stageName === "DEMAND_CREATED",
       startTime: stageName === "DEMAND_CREATED" ? createdAt : null,
       ownerName: stageName === "DEMAND_CREATED" ? createdBy : null,
-      relatedCustomer: stageName === "DEMAND_CREATED" ? relatedCustomer ?? null : null,
+      relatedCustomer: null,
+      blockingReason: null,
     })),
   });
 }

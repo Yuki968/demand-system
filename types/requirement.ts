@@ -31,6 +31,7 @@ export interface RequirementStageRecord {
   startTime: string | null;
   endTime: string | null;
   relatedCustomer: string | null;
+  blockingReason: string | null;
   outputProductRequirement: YesNoKey | null;
   outputSolution: YesNoKey | null;
   planCompleted: YesNoKey | null;
@@ -94,6 +95,7 @@ export interface UpdateRequirementInput {
     startTime?: string | null;
     endTime?: string | null;
     relatedCustomer?: string | null;
+    blockingReason?: string | null;
     outputProductRequirement?: YesNoKey | null;
     outputSolution?: YesNoKey | null;
     planCompleted?: YesNoKey | null;

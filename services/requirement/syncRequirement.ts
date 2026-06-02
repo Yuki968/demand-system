@@ -1,7 +1,6 @@
 ﻿import type { Prisma, RequirementStage } from "@/generated/prisma/client";
 
 import {
-  AFTER_SALES_OWNER,
   STAGE_ORDER_MAP,
   STAGE_SEQUENCE,
 } from "@/constants/requirement";
@@ -22,12 +21,11 @@ function hasProductIntakeStarted(stage: RequirementStage | undefined) {
   }
 
   return Boolean(
-    stage.ownerName ||
+      stage.ownerName ||
       stage.startTime ||
       stage.endTime ||
       stage.outputProductRequirement ||
-      stage.outputSolution ||
-      stage.relatedCustomer,
+      stage.outputSolution,
   );
 }
 
@@ -70,24 +68,13 @@ function resolveCurrentStatus(
 
 function resolveCurrentOwner(
   currentStatus: string,
-  createdBy: string,
   stagesByName: Partial<Record<StageNameKey, RequirementStage>>,
 ) {
   if (currentStatus === "CLOSED") {
     return null;
   }
 
-  const stageOwner = stagesByName[currentStatus as StageNameKey]?.ownerName ?? null;
-
-  if (currentStatus === "DEMAND_CREATED") {
-    return stageOwner ?? createdBy;
-  }
-
-  if (currentStatus === "IMPLEMENTATION_DELIVERY") {
-    return stageOwner ?? AFTER_SALES_OWNER;
-  }
-
-  return stageOwner;
+  return stagesByName[currentStatus as StageNameKey]?.ownerName ?? null;
 }
 
 export async function syncRequirement(requirementId: number) {
@@ -113,9 +100,7 @@ export async function syncRequirement(requirementId: number) {
 
   const productReached = hasProductIntakeStarted(productStage);
   const implementationReached = hasImplementationStarted(implementationStage);
-  const isClosed =
-    implementationStage?.deliveryCompleted === "YES" &&
-    implementationStage?.feedbackStatus === "FEEDBACK_RECEIVED";
+  const isClosed = implementationStage?.deliveryCompleted === "YES";
 
   if (demandStage) {
     demandStage.stageReached = true;
@@ -141,7 +126,7 @@ export async function syncRequirement(requirementId: number) {
   }
 
   const currentStatus = resolveCurrentStatus(stagesByName, isClosed);
-  const currentOwner = resolveCurrentOwner(currentStatus, requirement.createdBy, stagesByName);
+  const currentOwner = resolveCurrentOwner(currentStatus, stagesByName);
   const isFinished = isClosed;
   const totalDurationValue = requirement.totalDurationIsManual
     ? requirement.totalDurationValue
@@ -151,6 +136,11 @@ export async function syncRequirement(requirementId: number) {
           isFinished ? implementationStage?.endTime ?? today : today,
         )
       : null;
+  const mirroredCreatedAt = demandStage?.startTime ?? requirement.createdAt;
+  const mirroredCreatedBy =
+    demandStage?.ownerName && demandStage.ownerName.trim()
+      ? demandStage.ownerName
+      : requirement.createdBy;
 
   const stageUpdates = stages.map((stage) => ({
     stageName: stage.stageName,
@@ -159,7 +149,8 @@ export async function syncRequirement(requirementId: number) {
     ownerName: stage.ownerName,
     startTime: stage.startTime,
     endTime: stage.endTime,
-    relatedCustomer: stage.relatedCustomer,
+    relatedCustomer: null,
+    blockingReason: stage.blockingReason,
     outputProductRequirement: stage.outputProductRequirement,
     outputSolution: stage.outputSolution,
     planCompleted: stage.planCompleted,
@@ -179,6 +170,8 @@ export async function syncRequirement(requirementId: number) {
   await replaceStageSnapshots(requirement.id, stageUpdates);
 
   return updateRequirement(requirement.id, {
+    createdAt: mirroredCreatedAt,
+    createdBy: mirroredCreatedBy,
     currentStatus,
     currentOwner,
     isFinished,

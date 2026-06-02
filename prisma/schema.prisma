@@ -82,6 +82,7 @@ model RequirementStage {
   startTime                DateTime?
   endTime                  DateTime?
   relatedCustomer          String?
+  blockingReason           String?
 
   outputProductRequirement YesNoOption?
   outputSolution           YesNoOption?

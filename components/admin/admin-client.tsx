@@ -15,6 +15,10 @@ import { requestJson } from "@/lib/api-client";
 import { decodeUnicodeEscapes } from "@/lib/text";
 import type { RequirementRecord } from "@/types/requirement";
 
+function getDemandStageDraft(draft: RequirementDraft) {
+  return draft.stages.find((stage) => stage.stageName === "DEMAND_CREATED") ?? null;
+}
+
 export function AdminRequirementsClient({ initialRequirements }: { initialRequirements: RequirementRecord[] }) {
   const [requirements, setRequirements] = useState(initialRequirements);
   const [selectedId, setSelectedId] = useState<number | null>(initialRequirements[0]?.id ?? null);
@@ -131,7 +135,8 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
     setMessage(null);
     try {
       if (mode === "create") {
-        const created = await requestJson<RequirementRecord>("/api/requirements", { method: "POST", body: JSON.stringify({ requirementName: draft.requirementName, requirementType: draft.requirementType, requirementBelong: draft.requirementBelong, priority: draft.priority, createdAt: draft.createdAt, createdBy: draft.createdBy, relatedCustomer: draft.relatedCustomer, relatedProject: draft.relatedProject }), errorMessage: decodeUnicodeEscapes("需求创建失败，请稍后重试") });
+        const demandStage = getDemandStageDraft(draft);
+        const created = await requestJson<RequirementRecord>("/api/requirements", { method: "POST", body: JSON.stringify({ requirementName: draft.requirementName, requirementType: draft.requirementType, requirementBelong: draft.requirementBelong, priority: draft.priority, createdAt: demandStage?.startTime ?? draft.createdAt, createdBy: demandStage?.ownerName ?? draft.createdBy, relatedCustomer: draft.relatedCustomer, relatedProject: draft.relatedProject }), errorMessage: decodeUnicodeEscapes("需求创建失败，请稍后重试") });
         applyRequirementDetail(created);
         setMessageTone("success");
         setMessage(`${decodeUnicodeEscapes("需求")} #${created.requirementNo} ${decodeUnicodeEscapes("已创建并完成初始化同步")}`);
@@ -139,7 +144,8 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
         return;
       }
       if (!selectedRequirement) return;
-      const updated = await requestJson<RequirementRecord>(`/api/requirements/${selectedRequirement.id}`, { method: "PATCH", body: JSON.stringify({ requirement: { requirementName: draft.requirementName, requirementType: draft.requirementType, requirementBelong: draft.requirementBelong, priority: draft.priority, createdAt: draft.createdAt, createdBy: draft.createdBy, relatedCustomer: draft.relatedCustomer, relatedProject: draft.relatedProject, totalDurationValue: draft.totalDurationValue, totalDurationIsManual: draft.totalDurationIsManual }, stages: draft.stages.map((stage) => ({ stageName: stage.stageName, ownerName: stage.ownerName, startTime: stage.startTime, endTime: stage.endTime, relatedCustomer: stage.relatedCustomer, outputProductRequirement: stage.outputProductRequirement, outputSolution: stage.outputSolution, planCompleted: stage.planCompleted, deliveryCompleted: stage.deliveryCompleted, feedbackStatus: stage.feedbackStatus, feedbackContent: stage.feedbackContent, includeNextProduct: stage.includeNextProduct, targetProduct: stage.targetProduct })) }), errorMessage: decodeUnicodeEscapes("需求保存失败，请稍后重试") });
+      const demandStage = getDemandStageDraft(draft);
+      const updated = await requestJson<RequirementRecord>(`/api/requirements/${selectedRequirement.id}`, { method: "PATCH", body: JSON.stringify({ requirement: { requirementName: draft.requirementName, requirementType: draft.requirementType, requirementBelong: draft.requirementBelong, priority: draft.priority, createdAt: demandStage?.startTime ?? draft.createdAt, createdBy: demandStage?.ownerName ?? draft.createdBy, relatedCustomer: draft.relatedCustomer, relatedProject: draft.relatedProject, totalDurationValue: draft.totalDurationValue, totalDurationIsManual: draft.totalDurationIsManual }, stages: draft.stages.map((stage) => ({ stageName: stage.stageName, ownerName: stage.ownerName, startTime: stage.startTime, endTime: stage.endTime, relatedCustomer: null, blockingReason: stage.blockingReason, outputProductRequirement: stage.outputProductRequirement, outputSolution: stage.outputSolution, planCompleted: stage.planCompleted, deliveryCompleted: stage.deliveryCompleted, feedbackStatus: stage.feedbackStatus, feedbackContent: stage.feedbackContent, includeNextProduct: stage.includeNextProduct, targetProduct: stage.targetProduct })) }), errorMessage: decodeUnicodeEscapes("需求保存失败，请稍后重试") });
       applyRequirementDetail(updated);
       setMessageTone("success");
       setMessage(`${decodeUnicodeEscapes("需求")} #${updated.requirementNo} ${decodeUnicodeEscapes("已保存并同步")}`);

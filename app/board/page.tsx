@@ -1,7 +1,13 @@
 import { BoardClient } from "@/components/requirement/board-client";
 import { getRequirements } from "@/repositories/requirementRepository";
 
-export default async function BoardPage() {
+export default async function BoardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
   const requirements = await getRequirements();
-  return <BoardClient initialRequirements={requirements} />;
+  const params = await searchParams;
+
+  return <BoardClient initialRequirements={requirements} showBackToAdmin={params.from === "admin"} />;
 }

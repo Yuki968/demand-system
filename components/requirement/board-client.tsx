@@ -1,62 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { RequirementDetailPanel } from "@/components/requirement/detail-panel";
 import { RequirementFilterBar } from "@/components/requirement/filter-bar";
+import { RequirementPreviewCard } from "@/components/requirement/requirement-preview-card";
 import { filterRequirementList, getOwnerOptions } from "@/components/requirement/requirement-search";
-import { RequirementSummaryCard } from "@/components/requirement/requirement-summary-card";
 import { StatsCard } from "@/components/requirement/stats-card";
-import { requestJson } from "@/lib/api-client";
 import { decodeUnicodeEscapes } from "@/lib/text";
 import type { RequirementQueryParams, RequirementRecord } from "@/types/requirement";
 
-export function BoardClient({ initialRequirements }: { initialRequirements: RequirementRecord[] }) {
-  const searchParams = useSearchParams();
-  const showBackToAdmin = searchParams.get("from") === "admin";
-
-  const [requirements, setRequirements] = useState(initialRequirements);
-  const [selectedId, setSelectedId] = useState<number | undefined>(initialRequirements[0]?.id);
-  const [selectedDetail, setSelectedDetail] = useState<RequirementRecord | null>(initialRequirements[0] ?? null);
+export function BoardClient({ initialRequirements, showBackToAdmin = false }: { initialRequirements: RequirementRecord[]; showBackToAdmin?: boolean }) {
   const [filters, setFilters] = useState<RequirementQueryParams>({ status: "", owner: "", type: "", keyword: "" });
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
-  const filteredRequirements = useMemo(() => filterRequirementList(requirements, filters), [requirements, filters]);
-  const ownerOptions = useMemo(() => getOwnerOptions(requirements), [requirements]);
-
-  useEffect(() => {
-    if (!filteredRequirements.length) {
-      setSelectedId(undefined);
-      setSelectedDetail(null);
-      return;
-    }
-
-    const matched = filteredRequirements.find((item) => item.id === selectedId) ?? filteredRequirements[0];
-    setSelectedId(matched.id);
-    setSelectedDetail((current) => (current?.id === matched.id ? current : matched));
-  }, [filteredRequirements, selectedId]);
-
-  async function handleSelect(item: RequirementRecord) {
-    setSelectedId(item.id);
-    setSelectedDetail(item);
-    setDetailLoading(true);
-    setMessage(null);
-
-    try {
-      const detail = await requestJson<RequirementRecord>(`/api/requirements/${item.id}`, {
-        errorMessage: decodeUnicodeEscapes("\u9700\u6c42\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"),
-      });
-      setRequirements((current) => current.map((entry) => (entry.id === detail.id ? detail : entry)));
-      setSelectedDetail(detail);
-    } catch (loadError) {
-      setMessage(loadError instanceof Error ? loadError.message : decodeUnicodeEscapes("\u9700\u6c42\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25"));
-    } finally {
-      setDetailLoading(false);
-    }
-  }
+  const filteredRequirements = useMemo(() => filterRequirementList(initialRequirements, filters), [initialRequirements, filters]);
+  const ownerOptions = useMemo(() => getOwnerOptions(initialRequirements), [initialRequirements]);
 
   const stats = useMemo(() => {
     const finished = filteredRequirements.filter((item) => item.isFinished).length;
@@ -65,6 +23,10 @@ export function BoardClient({ initialRequirements }: { initialRequirements: Requ
     const longest = filteredRequirements.reduce((max, item) => Math.max(max, item.totalDurationValue ?? 0), 0);
     return { finished, activeOwners, highPriority, longest };
   }, [filteredRequirements]);
+
+  function getDetailHref(item: RequirementRecord) {
+    return showBackToAdmin ? `/board/${item.id}?from=admin` : `/board/${item.id}`;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-6 py-8 lg:px-10 xl:px-12 2xl:px-14">
@@ -88,27 +50,37 @@ export function BoardClient({ initialRequirements }: { initialRequirements: Requ
         <StatsCard label={"\u6700\u957f\u603b\u65f6\u957f"} value={`${stats.longest} \u5929`} hint={"\u5f53\u524d\u7b5b\u9009\u7ed3\u679c\u4e2d\u7684\u6700\u957f\u603b\u65f6\u957f"} accent="sky" />
       </section>
 
-      <RequirementFilterBar filters={filters} ownerOptions={ownerOptions} onChange={setFilters} />
-
-      <section className="grid gap-6 xl:grid-cols-[400px_minmax(0,1.16fr)] 2xl:grid-cols-[420px_minmax(0,1.2fr)]">
-        <aside className="rounded-[2rem] border border-[var(--border-soft)] bg-white p-5 shadow-[var(--shadow-panel)]">
-          <div className="flex items-end justify-between gap-4 border-b border-slate-100 pb-4">
+      <section className="rounded-[2rem] border border-[var(--border-soft)] bg-white shadow-[var(--shadow-panel)]">
+        <div className="border-b border-slate-100 px-6 py-6 lg:px-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Overview</p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900">{decodeUnicodeEscapes("\u9700\u6c42\u603b\u770b\u677f")}</h3>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Requirement List</p>
+              <h3 className="mt-2 text-2xl font-semibold text-slate-900">{decodeUnicodeEscapes("\u9700\u6c42\u5217\u8868")}</h3>
             </div>
             <div className="text-right text-sm text-slate-500">
-              <p>{filteredRequirements.length}{decodeUnicodeEscapes(" \u6761\u7ed3\u679c")}</p>
-              <p>{detailLoading ? decodeUnicodeEscapes("\u6b63\u5728\u5237\u65b0\u8be6\u60c5") : message ?? `${decodeUnicodeEscapes("\u6d3b\u8dc3\u8d1f\u8d23\u4eba")} ${stats.activeOwners} ${decodeUnicodeEscapes("\u4eba")}`}</p>
+              <p>{filteredRequirements.length}{decodeUnicodeEscapes(" \u6761\u9700\u6c42")}</p>
+              <p>{decodeUnicodeEscapes("\u6d3b\u8dc3\u8d1f\u8d23\u4eba")} {stats.activeOwners} {decodeUnicodeEscapes("\u4eba")}</p>
             </div>
           </div>
+        </div>
 
-          <div className="mt-4 max-h-[calc(100vh-18rem)] space-y-3 overflow-y-auto pr-1">
-            {filteredRequirements.length ? filteredRequirements.map((item) => <RequirementSummaryCard key={item.id} item={item} selected={item.id === selectedId} onClick={handleSelect} />) : <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">{decodeUnicodeEscapes("\u5f53\u524d\u7b5b\u9009\u6761\u4ef6\u4e0b\u6ca1\u6709\u5339\u914d\u7684\u9700\u6c42\u3002")}</div>}
+        <div className="space-y-5 px-6 py-6 lg:px-8">
+          <RequirementFilterBar filters={filters} ownerOptions={ownerOptions} onChange={setFilters} />
+
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+            {filteredRequirements.length ? (
+              filteredRequirements.map((item) => (
+                <Link key={item.id} href={getDetailHref(item)} className="block h-full">
+                  <RequirementPreviewCard item={item} />
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center text-sm text-slate-500 lg:col-span-2 2xl:col-span-3">
+                {decodeUnicodeEscapes("\u5f53\u524d\u7b5b\u9009\u6761\u4ef6\u4e0b\u6ca1\u6709\u5339\u914d\u7684\u9700\u6c42\u3002")}
+              </div>
+            )}
           </div>
-        </aside>
-
-        <RequirementDetailPanel item={selectedDetail} loading={detailLoading} />
+        </div>
       </section>
     </div>
   );

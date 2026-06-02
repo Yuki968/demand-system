@@ -40,32 +40,36 @@ export function RequirementTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {items.map((item) => (
-              <tr
-                key={item.id}
-                className={cn(
-                  "cursor-pointer transition hover:bg-sky-50/70",
-                  selectedId === item.id && "bg-sky-50",
-                )}
-                onClick={() => onSelect(item)}
-              >
-                <td className="px-4 py-4 font-semibold text-slate-700">#{item.requirementNo}</td>
-                <td className="px-4 py-4 text-slate-500">{item.createdAt}</td>
-                <td className="px-4 py-4">
-                  <div className="min-w-[220px]">
-                    <p className="font-semibold text-slate-900">{item.requirementName}</p>
-                    <p className="mt-1 text-xs text-slate-500">提出人 {item.createdBy}</p>
-                  </div>
-                </td>
-                <td className="px-4 py-4 text-slate-600">{REQUIREMENT_TYPE_LABELS[item.requirementType]}</td>
-                <td className="px-4 py-4 text-slate-600">{REQUIREMENT_BELONG_LABELS[item.requirementBelong]}</td>
-                <td className="px-4 py-4"><PriorityBadge priority={item.priority} /></td>
-                <td className="px-4 py-4"><StatusBadge status={item.currentStatus} /></td>
-                <td className="px-4 py-4 text-slate-600">{item.currentOwner ?? "待分配"}</td>
-                <td className="px-4 py-4 text-slate-600">{item.relatedProject ?? "-"}</td>
-                <td className="px-4 py-4 font-semibold text-slate-700">{item.totalDurationValue ? `${item.totalDurationValue} 天` : "-"}</td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const demandStage = item.stages.find((stage) => stage.stageName === "DEMAND_CREATED");
+
+              return (
+                <tr
+                  key={item.id}
+                  className={cn(
+                    "cursor-pointer transition hover:bg-sky-50/70",
+                    selectedId === item.id && "bg-sky-50",
+                  )}
+                  onClick={() => onSelect(item)}
+                >
+                  <td className="px-4 py-4 font-semibold text-slate-700">#{item.requirementNo}</td>
+                  <td className="px-4 py-4 text-slate-500">{demandStage?.startTime ?? item.createdAt}</td>
+                  <td className="px-4 py-4">
+                    <div className="min-w-[220px]">
+                      <p className="font-semibold text-slate-900">{item.requirementName}</p>
+                      <p className="mt-1 text-xs text-slate-500">提出人 {demandStage?.ownerName ?? item.createdBy}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-slate-600">{REQUIREMENT_TYPE_LABELS[item.requirementType]}</td>
+                  <td className="px-4 py-4 text-slate-600">{REQUIREMENT_BELONG_LABELS[item.requirementBelong]}</td>
+                  <td className="px-4 py-4"><PriorityBadge priority={item.priority} /></td>
+                  <td className="px-4 py-4"><StatusBadge status={item.currentStatus} /></td>
+                  <td className="px-4 py-4 text-slate-600">{item.currentOwner ?? "待分配"}</td>
+                  <td className="px-4 py-4 text-slate-600">{item.relatedProject ?? "-"}</td>
+                  <td className="px-4 py-4 font-semibold text-slate-700">{item.totalDurationValue ? `${item.totalDurationValue} 天` : "-"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

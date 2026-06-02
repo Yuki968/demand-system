@@ -13,13 +13,15 @@ export function RequirementDetailPanel({ item, loading }: { item: RequirementRec
     return <div className="rounded-3xl border border-dashed border-slate-300 bg-white/80 p-8 text-center text-sm text-slate-500 shadow-[var(--shadow-panel)]">{decodeUnicodeEscapes("\u4ece\u5de6\u4fa7\u9009\u62e9\u4e00\u6761\u9700\u6c42\u540e\uff0c\u8fd9\u91cc\u4f1a\u5c55\u793a\u4e3b\u4fe1\u606f\u3001\u5f53\u524d\u8fdb\u5c55\u548c\u9636\u6bb5\u6d41\u8f6c\u8be6\u60c5\u3002")}</div>;
   }
 
+  const demandStage = item.stages.find((stage) => stage.stageName === "DEMAND_CREATED");
+
   return (
     <div className="space-y-5 rounded-3xl border border-[var(--border-soft)] bg-white p-6 shadow-[var(--shadow-panel)]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Requirement #{item.requirementNo}</p>
           <h3 className="mt-2 text-2xl font-semibold text-slate-900">{displayText(item.requirementName)}</h3>
-          <p className="mt-2 text-sm text-slate-500">{decodeUnicodeEscapes("\u63d0\u51fa\u4e8e ")}{displayText(item.createdAt)}{decodeUnicodeEscapes("\uff0c\u63d0\u51fa\u4eba ")}{displayText(item.createdBy)}{loading ? ` ${decodeUnicodeEscapes("\u00b7 \u6b63\u5728\u5237\u65b0\u8be6\u60c5")}` : ""}</p>
+          <p className="mt-2 text-sm text-slate-500">{decodeUnicodeEscapes("\u63d0\u51fa\u4e8e ")}{displayText(demandStage?.startTime ?? item.createdAt)}{decodeUnicodeEscapes("\uff0c\u63d0\u51fa\u4eba ")}{displayText(demandStage?.ownerName ?? item.createdBy)}{loading ? ` ${decodeUnicodeEscapes("\u00b7 \u6b63\u5728\u5237\u65b0\u8be6\u60c5")}` : ""}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <StatusBadge className="whitespace-nowrap" status={item.currentStatus} />

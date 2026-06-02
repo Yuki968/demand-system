@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       totalDurationIsManual: false,
     });
 
-    await initializeStages(created.id, createdAt, data.createdBy, data.relatedCustomer);
+    await initializeStages(created.id, createdAt, data.createdBy);
     await syncRequirement(created.id);
 
     const detail = await getRequirementById(created.id);
