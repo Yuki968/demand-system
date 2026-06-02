@@ -1,5 +1,5 @@
 import { PrismaClient } from "@/generated/prisma/client";
-import { createSqliteAdapter } from "@/lib/prisma-adapter";
+import { createMysqlAdapter } from "@/lib/prisma-adapter";
 
 declare global {
   var __prisma: PrismaClient | undefined;
@@ -7,7 +7,7 @@ declare global {
 
 function createPrismaClient() {
   return new PrismaClient({
-    adapter: createSqliteAdapter(),
+    adapter: createMysqlAdapter(),
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 }

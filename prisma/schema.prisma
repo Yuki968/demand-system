@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
 }
 
 enum RequirementType {
@@ -53,15 +53,15 @@ model Requirement {
   id                    Int                @id @default(autoincrement())
   requirementNo         Int                @unique
   createdAt             DateTime
-  requirementName       String
+  requirementName       String             @db.Text
   requirementType       RequirementType
   requirementBelong     RequirementBelong
   priority              PriorityLevel
   currentStatus         RequirementStatus
-  currentOwner          String?
-  relatedProject        String?
-  createdBy             String
-  relatedCustomer       String?
+  currentOwner          String?            @db.VarChar(191)
+  relatedProject        String?            @db.VarChar(255)
+  createdBy             String             @db.VarChar(191)
+  relatedCustomer       String?            @db.VarChar(255)
   isFinished            Boolean            @default(false)
   totalDurationValue    Int?
   totalDurationIsManual Boolean            @default(false)
@@ -78,11 +78,11 @@ model RequirementStage {
   stageName                StageName
   stageOrder               Int
   stageReached             Boolean         @default(false)
-  ownerName                String?
+  ownerName                String?         @db.VarChar(191)
   startTime                DateTime?
   endTime                  DateTime?
-  relatedCustomer          String?
-  blockingReason           String?
+  relatedCustomer          String?         @db.VarChar(255)
+  blockingReason           String?         @db.Text
 
   outputProductRequirement YesNoOption?
   outputSolution           YesNoOption?
@@ -90,9 +90,9 @@ model RequirementStage {
   deliveryCompleted        YesNoOption?
 
   feedbackStatus           FeedbackStatus?
-  feedbackContent          String?
+  feedbackContent          String?         @db.Text
   includeNextProduct       YesNoOption?
-  targetProduct            String?
+  targetProduct            String?         @db.VarChar(255)
 
   durationValue            Int?
   durationIsManual         Boolean         @default(false)
@@ -106,10 +106,10 @@ model RequirementStage {
 
 model FieldOption {
   id                 Int       @id @default(autoincrement())
-  fieldName          String
-  optionValue        String
-  optionLabel        String
-  optionGroup        String?
+  fieldName          String    @db.VarChar(191)
+  optionValue        String    @db.VarChar(191)
+  optionLabel        String    @db.VarChar(255)
+  optionGroup        String?   @db.VarChar(191)
   optionOrder        Int
   isActive           Boolean   @default(true)
   createdAt          DateTime  @default(now())

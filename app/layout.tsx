@@ -1,19 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 
 import { decodeUnicodeEscapes } from "@/lib/text";
 
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: decodeUnicodeEscapes("\u9700\u6c42\u53ef\u89c6\u5316\u7cfb\u7edf"),
@@ -22,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+    <html lang="zh-CN" className="h-full">
       <body className="min-h-screen bg-[var(--bg-canvas)] font-sans text-slate-900 antialiased">
         <div className="relative min-h-screen overflow-hidden">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_42%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_38%)]" />

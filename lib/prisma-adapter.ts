@@ -1,14 +1,7 @@
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
 import { getDatabaseUrl } from "@/lib/env";
 
-export function createSqliteAdapter() {
-  return new PrismaBetterSqlite3(
-    {
-      url: getDatabaseUrl(),
-    },
-    {
-      timestampFormat: "unixepoch-ms",
-    },
-  );
+export function createMysqlAdapter() {
+  return new PrismaMariaDb(getDatabaseUrl());
 }

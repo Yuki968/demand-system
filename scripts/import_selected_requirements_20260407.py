@@ -1,3 +1,15 @@
+"""
+Deprecated SQLite-only import helper.
+
+This script writes directly to the local `dev.db` SQLite file and is kept only
+for historical reference during the MySQL migration. It must not be used as the
+formal import path for production or Tencent Cloud deployments.
+
+To run it intentionally for legacy recovery work, set
+`ALLOW_SQLITE_LEGACY_IMPORT=1` in the environment first.
+"""
+
+import os
 import sqlite3
 from pathlib import Path
 
@@ -96,6 +108,13 @@ def build_stage_rows(current_status: str) -> list[dict[str, object]]:
 
 
 def main() -> None:
+    if os.getenv("ALLOW_SQLITE_LEGACY_IMPORT") != "1":
+        raise SystemExit(
+            "Deprecated SQLite import script blocked. "
+            "Use a MySQL-safe import path instead, or set "
+            "ALLOW_SQLITE_LEGACY_IMPORT=1 for explicit legacy recovery work."
+        )
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()

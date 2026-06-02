@@ -8,13 +8,17 @@
     "start": "next start",
     "lint": "eslint .",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:refresh": "prisma db push --force-reset && prisma db seed"
+    "db:reset:local": "prisma migrate reset --force",
+    "db:push:prototype": "prisma db push",
+    "db:refresh:prototype": "prisma db push --force-reset && prisma db seed"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.5.0",
+    "@prisma/adapter-mariadb": "^7.8.0",
     "@prisma/client": "^7.5.0",
+    "mariadb": "^3.5.2",
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"

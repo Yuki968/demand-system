@@ -1,6 +1,6 @@
 ﻿import "dotenv/config";
 
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
 import { PrismaClient } from "../generated/prisma/client";
 
@@ -14,20 +14,9 @@ function getDatabaseUrl() {
   return databaseUrl;
 }
 
-function createPrismaClient() {
-  const adapter = new PrismaBetterSqlite3(
-    {
-      url: getDatabaseUrl(),
-    },
-    {
-      timestampFormat: "unixepoch-ms",
-    },
-  );
-
-  return new PrismaClient({ adapter });
-}
-
-const prisma = createPrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaMariaDb(getDatabaseUrl()),
+});
 
 const stageSequence = [
   "DEMAND_CREATED",
