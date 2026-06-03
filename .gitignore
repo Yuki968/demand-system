@@ -31,6 +31,7 @@ yarn-error.log*
 .env.local
 .env.*.local
 .env*
+!.env.example
 # vercel
 .vercel/
 # local browser/runtime temp data

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   RequirementEditor,
@@ -19,19 +20,21 @@ function getDemandStageDraft(draft: RequirementDraft) {
   return draft.stages.find((stage) => stage.stageName === "DEMAND_CREATED") ?? null;
 }
 
-export function AdminRequirementsClient({ initialRequirements }: { initialRequirements: RequirementRecord[] }) {
-  const [requirements, setRequirements] = useState(initialRequirements);
-  const [selectedId, setSelectedId] = useState<number | null>(initialRequirements[0]?.id ?? null);
-  const [selectedRequirement, setSelectedRequirement] = useState<RequirementRecord | null>(initialRequirements[0] ?? null);
-  const [draft, setDraft] = useState<RequirementDraft>(initialRequirements[0] ? toDraftFromRequirement(initialRequirements[0]) : buildEmptyDraft());
-  const [mode, setMode] = useState<"create" | "edit">(initialRequirements[0] ? "edit" : "create");
+export function AdminRequirementsClient() {
+  const router = useRouter();
+  const [requirements, setRequirements] = useState<RequirementRecord[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedRequirement, setSelectedRequirement] = useState<RequirementRecord | null>(null);
+  const [draft, setDraft] = useState<RequirementDraft>(buildEmptyDraft());
+  const [mode, setMode] = useState<"create" | "edit">("edit");
   const [keyword, setKeyword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const filteredRequirements = useMemo(() => filterRequirementList(requirements, { keyword }), [requirements, keyword]);
 
@@ -43,18 +46,69 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
     }
   }
 
-  function mergeRequirementIntoList(list: RequirementRecord[], detail: RequirementRecord) {
-    let found = false;
-    const nextList = list.map((item) => {
-      if (item.id !== detail.id) {
-        return item;
-      }
-      found = true;
-      return detail;
-    });
+  const syncSelectionWithList = useCallback((
+    list: RequirementRecord[],
+    options?: {
+      preferredId?: number | null;
+      preferredDetail?: RequirementRecord;
+    },
+  ) => {
+    const preferredId = options?.preferredId ?? selectedId;
+    const preferredDetail =
+      options?.preferredDetail && list.some((item) => item.id === options.preferredDetail?.id)
+        ? options.preferredDetail
+        : null;
+    const preferredItem =
+      preferredDetail ??
+      (preferredId ? list.find((item) => item.id === preferredId) ?? null : null);
+    const nextSelected = preferredItem ?? list[0] ?? null;
 
-    return found ? nextList : [detail, ...nextList];
-  }
+    if (!nextSelected) {
+      setSelectedId(null);
+      applyRequirementDetail(null);
+      setMode("edit");
+      return;
+    }
+
+    setSelectedId(nextSelected.id);
+    applyRequirementDetail(nextSelected);
+    setMode("edit");
+  }, [selectedId]);
+
+  const loadRequirements = useCallback(async (options?: {
+    preferredId?: number | null;
+    preferredDetail?: RequirementRecord;
+  }) => {
+    setLoading(true);
+    setShowDeleteConfirm(false);
+
+    try {
+      const list = await requestJson<RequirementRecord[]>("/api/requirements", {
+        cache: "no-store",
+        errorMessage: decodeUnicodeEscapes("需求列表加载失败，请稍后重试"),
+      });
+      setRequirements(list);
+      syncSelectionWithList(list, options);
+      setMessage(null);
+    } catch (error) {
+      setRequirements([]);
+      setSelectedId(null);
+      applyRequirementDetail(null);
+      setMode("edit");
+      setMessageTone("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : decodeUnicodeEscapes("需求列表加载失败，请稍后重试"),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [syncSelectionWithList]);
+
+  useEffect(() => {
+    void loadRequirements();
+  }, [loadRequirements]);
 
   useEffect(() => {
     if (mode === "create") return;
@@ -66,68 +120,16 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
     if (!selectedId || !filteredRequirements.some((item) => item.id === selectedId)) {
       const fallback = filteredRequirements[0];
       setSelectedId(fallback.id);
+      applyRequirementDetail(fallback);
+      setMode("edit");
     }
   }, [filteredRequirements, mode, selectedId]);
 
-  useEffect(() => {
-    if (!selectedId) return;
-
-    let cancelled = false;
-
-    async function loadDetail() {
-      setLoading(true);
-      try {
-        const detail = await requestJson<RequirementRecord>(`/api/requirements/${selectedId}`, {
-          errorMessage: decodeUnicodeEscapes("需求详情加载失败，请稍后重试"),
-        });
-        if (cancelled) {
-          return;
-        }
-        applyRequirementDetail(detail);
-        setMessage(null);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        setMessageTone("error");
-        setMessage(error instanceof Error ? error.message : decodeUnicodeEscapes("需求详情加载失败，请稍后重试"));
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-    void loadDetail();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId]);
-
   async function refreshList(targetId?: number, latestDetail?: RequirementRecord) {
-    const list = await requestJson<RequirementRecord[]>("/api/requirements", {
-      errorMessage: decodeUnicodeEscapes("需求列表加载失败，请稍后重试"),
+    await loadRequirements({
+      preferredId: targetId ?? selectedId,
+      preferredDetail: latestDetail,
     });
-    const nextList = latestDetail ? mergeRequirementIntoList(list, latestDetail) : list;
-    setRequirements(nextList);
-
-    if (targetId) {
-      setSelectedId(targetId);
-      if (latestDetail?.id === targetId) {
-        applyRequirementDetail(latestDetail);
-        return;
-      }
-      const detail = await requestJson<RequirementRecord>(`/api/requirements/${targetId}`, {
-        errorMessage: decodeUnicodeEscapes("需求详情加载失败，请稍后重试"),
-      });
-      applyRequirementDetail(detail);
-      return;
-    }
-
-    if (!list.length) {
-      setSelectedId(null);
-      applyRequirementDetail(null);
-    }
   }
 
   async function handleSubmit() {
@@ -201,6 +203,7 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
       if (nextSelection) {
         setMode("edit");
         setSelectedId(nextSelection.id);
+        applyRequirementDetail(nextSelection);
       } else {
         setSelectedId(null);
         applyRequirementDetail(null);
@@ -223,6 +226,40 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
     setShowDeleteConfirm(false);
   }
 
+  async function handleLogout() {
+    setLoggingOut(true);
+    setMessage(null);
+
+    try {
+      await requestJson<{ authenticated: boolean }>("/api/admin/session", {
+        method: "DELETE",
+        errorMessage: decodeUnicodeEscapes("退出后台失败，请稍后重试"),
+      });
+      router.refresh();
+    } catch (error) {
+      setMessageTone("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : decodeUnicodeEscapes("退出后台失败，请稍后重试"),
+      );
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex max-w-[1500px] flex-col gap-6 px-6 py-8 lg:px-10">
+        <section className="rounded-[2rem] border border-[var(--border-soft)] bg-white p-8 shadow-[var(--shadow-panel)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-600">Admin Workspace</p>
+          <h2 className="mt-3 text-3xl font-semibold text-slate-900">{decodeUnicodeEscapes("正在加载真实需求数据")}</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-500">{decodeUnicodeEscapes("已通过后台登录校验，正在请求 GET /api/requirements 并同步云端真实需求列表。")}</p>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="mx-auto flex max-w-[1500px] flex-col gap-6 px-6 py-8 lg:px-10">
@@ -235,6 +272,7 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
             </div>
             <div className="flex flex-wrap gap-3">
               <Link href="/board?from=admin" className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700">{decodeUnicodeEscapes("返回前台看板")}</Link>
+              <button type="button" onClick={() => { void handleLogout(); }} disabled={loggingOut} className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60">{decodeUnicodeEscapes(loggingOut ? "退出中..." : "退出后台")}</button>
               <button type="button" onClick={handleCreate} className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{decodeUnicodeEscapes("新增需求")}</button>
             </div>
           </div>
@@ -256,12 +294,11 @@ export function AdminRequirementsClient({ initialRequirements }: { initialRequir
             {message ? <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${messageTone === "error" ? "border border-rose-200 bg-rose-50 text-rose-700" : "border border-emerald-200 bg-emerald-50 text-emerald-700"}`}>{decodeUnicodeEscapes(message)}</div> : null}
 
             <div className="mt-4 max-h-[calc(100vh-21rem)] space-y-3 overflow-y-auto pr-1">
-              {filteredRequirements.length ? filteredRequirements.map((item) => <RequirementSummaryCard key={item.id} item={item} selected={selectedId === item.id && mode === "edit"} onClick={(selected) => { setSelectedId(selected.id); setMode("edit"); setShowDeleteConfirm(false); }} />) : <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">{decodeUnicodeEscapes("暂无匹配的维护对象。")}</div>}
+              {filteredRequirements.length ? filteredRequirements.map((item) => <RequirementSummaryCard key={item.id} item={item} selected={selectedId === item.id && mode === "edit"} onClick={(selected) => { setSelectedId(selected.id); applyRequirementDetail(selected); setMode("edit"); setShowDeleteConfirm(false); }} />) : <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">{decodeUnicodeEscapes(requirements.length ? "暂无匹配的维护对象。" : "当前真实需求列表为空，请先新增需求或检查接口数据。")}</div>}
             </div>
           </aside>
 
           <section>
-            {loading ? <div className="mb-3 text-sm text-slate-500">{decodeUnicodeEscapes("正在加载需求详情...")}</div> : null}
             <RequirementEditor mode={mode} draft={draft} currentRequirement={selectedRequirement} onChange={setDraft} onSubmit={() => { void handleSubmit(); }} onSync={() => { void handleSync(); }} onDelete={() => setShowDeleteConfirm(true)} saving={saving} deleting={deleting} />
           </section>
         </div>

@@ -1,6 +1,7 @@
 ﻿import { RequirementStatus } from "@/generated/prisma/client";
 import { NextRequest } from "next/server";
 
+import { requireAdminAccess } from "@/lib/admin-auth";
 import { jsonError, jsonSuccess } from "@/lib/http";
 import {
   createRequirement,
@@ -25,6 +26,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireAdminAccess();
+
+    if (!access.ok) {
+      return jsonError(access.message, access.status);
+    }
+
     const payload = await request.json();
     const { data, errors } = validateCreateRequirementInput(payload);
 

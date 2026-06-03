@@ -1,5 +1,6 @@
 ﻿import { NextRequest } from "next/server";
 
+import { requireAdminAccess } from "@/lib/admin-auth";
 import { jsonError, jsonSuccess } from "@/lib/http";
 import { getRequirementById } from "@/repositories/requirementRepository";
 import { syncRequirement } from "@/services/requirement/syncRequirement";
@@ -11,6 +12,12 @@ function parseRequirementId(value: string) {
 
 export async function POST(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const access = await requireAdminAccess();
+
+    if (!access.ok) {
+      return jsonError(access.message, access.status);
+    }
+
     const params = await context.params;
     const id = parseRequirementId(params.id);
 
