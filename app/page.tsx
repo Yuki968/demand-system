@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { BoardClient } from "@/components/requirement/board-client";
+import { getStaticRequirements } from "@/lib/static-requirements";
 
 export default function HomePage() {
-  redirect("/board");
+  return <BoardClient initialRequirements={getStaticRequirements()} />;
 }

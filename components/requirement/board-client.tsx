@@ -10,7 +10,7 @@ import { StatsCard } from "@/components/requirement/stats-card";
 import { decodeUnicodeEscapes } from "@/lib/text";
 import type { RequirementQueryParams, RequirementRecord } from "@/types/requirement";
 
-export function BoardClient({ initialRequirements, showBackToAdmin = false }: { initialRequirements: RequirementRecord[]; showBackToAdmin?: boolean }) {
+export function BoardClient({ initialRequirements }: { initialRequirements: RequirementRecord[] }) {
   const [filters, setFilters] = useState<RequirementQueryParams>({ status: "", owner: "", type: "", keyword: "" });
 
   const filteredRequirements = useMemo(() => filterRequirementList(initialRequirements, filters), [initialRequirements, filters]);
@@ -24,10 +24,6 @@ export function BoardClient({ initialRequirements, showBackToAdmin = false }: { 
     return { finished, activeOwners, highPriority, longest };
   }, [filteredRequirements]);
 
-  function getDetailHref(item: RequirementRecord) {
-    return showBackToAdmin ? `/board/${item.id}?from=admin` : `/board/${item.id}`;
-  }
-
   return (
     <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-6 py-8 lg:px-10 xl:px-12 2xl:px-14">
       <section className="grid gap-6 xl:grid-cols-[minmax(0,2.35fr)_repeat(3,minmax(0,1fr))] 2xl:grid-cols-[minmax(0,2.55fr)_repeat(3,minmax(0,1fr))]">
@@ -38,11 +34,9 @@ export function BoardClient({ initialRequirements, showBackToAdmin = false }: { 
               <h2 className="max-w-[24ch] text-[clamp(2rem,2.2vw,2.6rem)] font-semibold leading-[1.16] tracking-tight text-slate-900 xl:whitespace-nowrap">{decodeUnicodeEscapes("\u4ea7\u54c1\u9700\u6c42\u7b5b\u67e5\u4e0e\u8fdb\u5ea6\u67e5\u770b\u770b\u677f")}</h2>
               <p className="max-w-[58rem] text-sm leading-7 text-slate-500 xl:text-[0.95rem]">{decodeUnicodeEscapes("\u9762\u5411\u4ea7\u54c1\u603b\u76d1\u3001\u4ea7\u54c1\u7ecf\u7406\u3001\u8fd0\u8425\u548c\u9879\u76ee\u534f\u540c\u4eba\u5458\uff0c\u96c6\u4e2d\u67e5\u770b\u9700\u6c42\u5f53\u524d\u72b6\u6001\u3001\u8d1f\u8d23\u4eba\u548c\u9636\u6bb5\u8fdb\u5c55\u3002")}</p>
             </div>
-            {showBackToAdmin ? (
-              <Link href="/admin/requirements" className="shrink-0 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-sky-200 hover:text-sky-700">
-                {decodeUnicodeEscapes("\u8fd4\u56de\u540e\u53f0")}
-              </Link>
-            ) : null}
+            <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+              {decodeUnicodeEscapes("\u53ea\u8bfb\u5c55\u793a")}
+            </span>
           </div>
         </div>
         <StatsCard label={"\u5df2\u7ed3\u675f\u9700\u6c42"} value={stats.finished} hint={"\u5f53\u524d\u7b5b\u9009\u7ed3\u679c\u4e2d\u5df2\u5173\u95ed\u7684\u9700\u6c42\u6570\u91cf"} accent="emerald" />
@@ -70,7 +64,7 @@ export function BoardClient({ initialRequirements, showBackToAdmin = false }: { 
           <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {filteredRequirements.length ? (
               filteredRequirements.map((item) => (
-                <Link key={item.id} href={getDetailHref(item)} className="block h-full">
+                <Link key={item.id} href={`/board/${item.id}`} className="block h-full">
                   <RequirementPreviewCard item={item} />
                 </Link>
               ))
