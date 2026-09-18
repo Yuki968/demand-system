@@ -43,7 +43,7 @@ npm run build
 3. 上传 `out/`；
 4. 发布到 GitHub Pages。
 
-仓库的 GitHub Pages Source 需要设置为 **GitHub Actions**。
+工作流会在仓库尚未启用 Pages 时尝试自动启用，并使用 **GitHub Actions** 作为发布来源。
 
 ## 数据库版本保留说明
 
